@@ -24,6 +24,18 @@ jobs:
         working-directory: backend
         run: npm run typecheck
 
+      - name: backend - checar secrets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_APP_URL: ${{ secrets.DATABASE_APP_URL }}
+        run: |
+          fail=0
+          if [ -z "$DATABASE_URL" ]; then echo "::error::secret DATABASE_URL vazio"; fail=1
+          else echo "DATABASE_URL: ${#DATABASE_URL} chars, prefixo ${DATABASE_URL%%:*}"; fi
+          if [ -z "$DATABASE_APP_URL" ]; then echo "::error::secret DATABASE_APP_URL vazio"; fail=1
+          else echo "DATABASE_APP_URL: ${#DATABASE_APP_URL} chars, prefixo ${DATABASE_APP_URL%%:*}"; fi
+          exit $fail
+
       - name: backend - migrations
         working-directory: backend
         env:
