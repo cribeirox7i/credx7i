@@ -84,20 +84,31 @@ describe("com contexto do tenant alpha, o tenant beta é invisível", () => {
     });
   });
 
+  // UPDATE/DELETE mirando o beta: ou não afeta linha nenhuma (RLS), ou é barrado por
+  // falta de permissão (auditoria é append-only). Os dois desfechos são aceitáveis; o
+  // que não pode é afetar uma linha do beta.
   it.each(TABELAS_NEGOCIO)("UPDATE em %s não afeta linha do beta", async (tabela) => {
     await comContexto(appPool, alpha.tenantId, async (c) => {
-      const r = await c.query(
-        `UPDATE ${tabela} SET tenant_id = tenant_id WHERE tenant_id = $1`,
-        [beta.tenantId],
-      );
-      expect(r.rowCount).toBe(0);
+      try {
+        const r = await c.query(
+          `UPDATE ${tabela} SET tenant_id = tenant_id WHERE tenant_id = $1`,
+          [beta.tenantId],
+        );
+        expect(r.rowCount).toBe(0);
+      } catch (e) {
+        expect(String(e)).toMatch(/permission denied|row-level security/i);
+      }
     });
   });
 
   it.each(TABELAS_NEGOCIO)("DELETE em %s não remove linha do beta", async (tabela) => {
     await comContexto(appPool, alpha.tenantId, async (c) => {
-      const r = await c.query(`DELETE FROM ${tabela} WHERE tenant_id = $1`, [beta.tenantId]);
-      expect(r.rowCount).toBe(0);
+      try {
+        const r = await c.query(`DELETE FROM ${tabela} WHERE tenant_id = $1`, [beta.tenantId]);
+        expect(r.rowCount).toBe(0);
+      } catch (e) {
+        expect(String(e)).toMatch(/permission denied|row-level security/i);
+      }
     });
   });
 
@@ -106,6 +117,21 @@ describe("com contexto do tenant alpha, o tenant beta é invisível", () => {
     await expect(
       comContexto(appPool, alpha.tenantId, (c) => c.query(sql, params)),
     ).rejects.toThrow(/row-level security|violates/i);
+  });
+});
+
+describe("auditoria é append-only para a aplicação", () => {
+  it("UPDATE e DELETE na própria auditoria são barrados", async () => {
+    await comContexto(appPool, alpha.tenantId, async (c) => {
+      await expect(
+        c.query("UPDATE auditoria SET acao = 'x' WHERE tenant_id = $1", [alpha.tenantId]),
+      ).rejects.toThrow(/permission denied/i);
+    });
+    await comContexto(appPool, alpha.tenantId, async (c) => {
+      await expect(
+        c.query("DELETE FROM auditoria WHERE tenant_id = $1", [alpha.tenantId]),
+      ).rejects.toThrow(/permission denied/i);
+    });
   });
 });
 

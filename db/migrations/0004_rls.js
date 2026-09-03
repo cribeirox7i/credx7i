@@ -6,8 +6,8 @@ exports.shorthands = undefined;
 // Para toda tabela de negócio:
 //   - ENABLE + FORCE ROW LEVEL SECURITY (FORCE aplica a política até ao dono da tabela)
 //   - política tenant_isolation: só enxerga/grava linha cujo tenant_id bate com
-//     current_setting('app.tenant_id'). Sem o contexto definido -> current_setting
-//     retorna NULL -> zero linhas (falha fechada).
+//     NULLIF(current_setting('app.tenant_id', true), ''). Sem contexto (ou contexto ''
+//     residual do pooler) -> NULL -> zero linhas (falha fechada).
 //   - GRANT explícito para credx7i_app (nada de default privileges: tabela nova não
 //     mapeada aqui é invisível para a aplicação, além de ser pega pela suíte de isolamento).
 //
@@ -29,8 +29,8 @@ function habilitarRls(pgm, tabela, grant) {
     ALTER TABLE ${tabela} ENABLE ROW LEVEL SECURITY;
     ALTER TABLE ${tabela} FORCE ROW LEVEL SECURITY;
     CREATE POLICY tenant_isolation ON ${tabela}
-      USING      (tenant_id = current_setting('app.tenant_id', true)::uuid)
-      WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::uuid);
+      USING      (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+      WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
     GRANT ${grant} ON ${tabela} TO credx7i_app;
   `);
 }

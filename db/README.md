@@ -19,16 +19,20 @@ Postgres do projeto Supabase `credx7i-dev` (ref `yjpinvutihkykcckbdet`), região
    conteúdo de [`roles.sql`](roles.sql) *depois de trocar os dois placeholders de senha*.
    Guardar as senhas.
 
-2. **Montar as connection strings** em `backend/.env` (copiar de `backend/.env.example`):
-   - `DATABASE_URL` - "Direct connection" do painel Supabase, trocando o usuário `postgres`
-     por `credx7i_owner` e a senha pela senha do owner.
-     Ex.: `postgresql://credx7i_owner:SENHA@db.yjpinvutihkykcckbdet.supabase.co:5432/postgres`
-   - `DATABASE_POOLER_URL` - "Transaction pooler" do painel. **Atenção ao formato do
-     usuário no pooler do Supabase (Supavisor):** é `credx7i_app.yjpinvutihkykcckbdet`
-     (role + ponto + ref do projeto), não só `credx7i_app`.
-     Ex.: `postgresql://credx7i_app.yjpinvutihkykcckbdet:SENHA@aws-0-sa-east-1.pooler.supabase.com:6543/postgres`
-   - `DATABASE_APP_URL` (opcional) - "Direct connection" com `credx7i_app` (sem o sufixo
-     `.ref`), usada só pela suíte de isolamento.
+2. **Montar as connection strings** em `backend/.env` (copiar de `backend/.env.example`).
+
+   O host direto `db.<ref>.supabase.co` é **IPv6-only** nos projetos novos do Supabase.
+   Sem IPv6 na rede, ele nem resolve - então as três strings vão pelo **pooler** (IPv4),
+   e o usuário leva o ref do projeto grudado (`credx7i_owner.<ref>`, `credx7i_app.<ref>`):
+
+   - `DATABASE_URL` - role `credx7i_owner`, **session pooler** (porta 5432). Migrations.
+   - `DATABASE_POOLER_URL` - role `credx7i_app`, **transaction pooler** (porta 6543). Runtime.
+   - `DATABASE_APP_URL` - role `credx7i_app`, **session pooler** (porta 5432). Suíte de isolamento.
+
+   Ex.: `postgresql://credx7i_owner.yjpinvutihkykcckbdet:SENHA@aws-0-sa-east-1.pooler.supabase.com:5432/postgres`
+
+   (Com IPv6 disponível, dá para usar o host direto nas duas de porta 5432; o pooler
+   transaction continua obrigatório para o runtime serverless.)
 
 3. **Aplicar as migrations:**
    ```bash

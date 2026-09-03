@@ -9,6 +9,7 @@
     "build": "tsc -p .",
     "typecheck": "tsc -p . --noEmit",
     "migrate": "node-pg-migrate -m ../db/migrations -j js --envPath .env",
+    "seed:dev": "tsx scripts/seed-dev.ts",
     "test:isolation": "vitest run test/isolation.test.ts"
   },
   "dependencies": {
