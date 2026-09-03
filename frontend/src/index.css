@@ -1,0 +1,88 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1c2430;
+  --border: #dfe3e8;
+  --accent: #1f6feb;
+  --red: #c0392b;
+  --radius: 4px;
+  --sans: "Segoe UI", system-ui, Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181d;
+    --surface: #1c2127;
+    --text: #e6e9ec;
+    --border: #2c333b;
+    --accent: #4c8dff;
+    --red: #e06c5b;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.shell {
+  max-width: 520px;
+  margin: 10vh auto 0;
+  padding: 0 20px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.sub {
+  margin: 4px 0 24px;
+  opacity: 0.65;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.card.erro {
+  border-color: var(--red);
+}
+
+.linha {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.linha:last-child {
+  border-bottom: none;
+}
+
+.linha span:first-child {
+  opacity: 0.65;
+}
+
+code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.dica {
+  margin-top: 10px;
+  opacity: 0.7;
+  font-size: 13px;
+}

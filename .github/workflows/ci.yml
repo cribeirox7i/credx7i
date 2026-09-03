@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # ---------------------------------------------------------------- backend
+      - name: backend - install
+        working-directory: backend
+        run: npm install
+
+      - name: backend - typecheck
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: backend - migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run migrate up
+
+      - name: backend - suíte de isolamento
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_APP_URL: ${{ secrets.DATABASE_APP_URL }}
+        run: npm run test:isolation
+
+      # --------------------------------------------------------------- frontend
+      - name: frontend - install
+        working-directory: frontend
+        run: npm install
+
+      - name: frontend - typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: frontend - build
+        working-directory: frontend
+        run: npm run build
