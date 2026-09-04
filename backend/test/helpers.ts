@@ -1,4 +1,5 @@
 import { Pool, PoolClient } from "pg";
+import { hashPassword } from "../src/authCrypto";
 
 // Conexão de setup/teardown: role credx7i_owner (Direct, 5432). Sem BYPASSRLS -> também
 // sujeita ao FORCE RLS, então toda operação em tabela de negócio passa por um contexto
@@ -66,8 +67,9 @@ export const TABELAS_NEGOCIO = [
   "arquivos",
 ] as const;
 
-// Tabelas do schema public que NÃO são de negócio (sem tenant_id / sem RLS por design).
-export const TABELAS_ISENTAS = new Set(["tenants", "pgmigrations"]);
+// Tabelas do schema public que NÃO são de negócio (sem tenant_id / sem RLS por design):
+// registry de tenants, controle de migrations, e o rate_limit (chaveado por IP, global).
+export const TABELAS_ISENTAS = new Set(["tenants", "pgmigrations", "rate_limit"]);
 
 export type SeedRefs = {
   tenantId: string;
@@ -126,12 +128,40 @@ export async function limparTenant(tenantId: string) {
   await comContextoCommit(adminPool, tenantId, async (c) => {
     await c.query("DELETE FROM auditoria WHERE tenant_id = $1", [tenantId]);
     await c.query("DELETE FROM permissoes WHERE tenant_id = $1", [tenantId]);
-    await c.query("DELETE FROM papeis WHERE tenant_id = $1", [tenantId]);
     await c.query("DELETE FROM usuario_sessoes WHERE tenant_id = $1", [tenantId]);
     await c.query("DELETE FROM arquivos WHERE tenant_id = $1", [tenantId]);
+    await c.query("UPDATE usuarios SET papel_id = NULL WHERE tenant_id = $1", [tenantId]);
+    await c.query("DELETE FROM papeis WHERE tenant_id = $1", [tenantId]);
     await c.query("DELETE FROM usuarios WHERE tenant_id = $1", [tenantId]);
   });
   await adminPool.query("DELETE FROM tenants WHERE tenant_id = $1", [tenantId]);
+}
+
+/** Tenant com um papel Administrador e um usuário admin ATIVO com a senha dada. */
+export async function semearTenantComAdmin(
+  slug: string,
+  email: string,
+  senha: string,
+): Promise<SeedRefs> {
+  const { rows } = await adminPool.query<{ tenant_id: string }>(
+    "INSERT INTO tenants (slug, nome) VALUES ($1, $2) RETURNING tenant_id",
+    [slug, `Tenant ${slug}`],
+  );
+  const tenantId = rows[0].tenant_id;
+  const refs = await comContextoCommit(adminPool, tenantId, async (c) => {
+    const p = await c.query<{ papel_id: string }>(
+      "INSERT INTO papeis (tenant_id, nome, admin_tenant) VALUES ($1, 'Administrador', true) RETURNING papel_id",
+      [tenantId],
+    );
+    const papelId = p.rows[0].papel_id;
+    const u = await c.query<{ user_id: string }>(
+      `INSERT INTO usuarios (tenant_id, nome, email, senha_hash, papel_id, status, deve_trocar_senha)
+       VALUES ($1, 'Admin', $2, $3, $4, 'ATIVO', false) RETURNING user_id`,
+      [tenantId, email, hashPassword(senha), papelId],
+    );
+    return { userId: u.rows[0].user_id, papelId };
+  });
+  return { tenantId, slug, ...refs };
 }
 
 // INSERT cruzado (tenant_id do outro tenant) por tabela: espera-se rejeição por WITH CHECK.

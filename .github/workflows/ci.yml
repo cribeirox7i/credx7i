@@ -42,12 +42,12 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run migrate up
 
-      - name: backend - suíte de isolamento
+      - name: backend - testes (isolamento + auth)
         working-directory: backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_APP_URL: ${{ secrets.DATABASE_APP_URL }}
-        run: npm run test:isolation
+        run: npm test
 
       # --------------------------------------------------------------- frontend
       - name: frontend - install

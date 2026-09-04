@@ -3,6 +3,8 @@ import cors from "cors";
 import { config } from "./config";
 import { tenantContext } from "./tenantContext";
 import { tenantsRouter } from "./routes/tenants";
+import { authRouter } from "./routes/auth";
+import { usuariosRouter } from "./routes/usuarios";
 
 const app = express();
 app.disable("x-powered-by");
@@ -35,7 +37,15 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 
 // Tudo sob /api exige um tenant resolvido (subdomínio, ou header/query em dev).
 app.use("/api", tenantContext);
+
+// Consulta pública do tenant (a tela de login mostra "ESC Alpha" antes de autenticar).
 app.use("/api/tenants", tenantsRouter);
+
+// Autenticação (cada rota do router faz o seu próprio gate).
+app.use("/api/auth", authRouter);
+
+// Administração do tenant (usuários, papéis, permissões) - o router exige sessão + admin.
+app.use("/api", usuariosRouter);
 
 // Sob Vercel a variável VERCEL existe e o app é exportado como handler; local dev abre a porta.
 if (!process.env.VERCEL) {

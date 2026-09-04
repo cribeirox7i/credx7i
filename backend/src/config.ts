@@ -18,6 +18,14 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default("http://localhost:5183"),
   // Domínio base do produto: o subdomínio antes dele é o slug do tenant.
   TENANT_BASE_DOMAIN: z.string().default("credx7i.local"),
+  // Sessão de usuário (token opaco em tabela).
+  SESSION_TTL_DIAS: z.coerce.number().default(5),
+  // Convite / redefinição de senha.
+  INVITE_TTL_HORAS: z.coerce.number().default(48),
+  // Base do frontend, para montar o link de convite.
+  FRONTEND_URL: z.string().default("http://localhost:5183"),
+  // SMTP é opcional: sem ele, o link de convite vai para o log e para a resposta do admin.
+  SMTP_URL: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

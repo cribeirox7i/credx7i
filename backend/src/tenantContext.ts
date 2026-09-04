@@ -46,7 +46,10 @@ function extrairSlug(req: Request): string | null {
     if (sub && sub !== "www") return sub;
   }
 
-  if (!process.env.VERCEL) {
+  // Fora de produção (dev local, testes) não há DNS wildcard: aceita o slug por header
+  // ou querystring. Em produção (Vercel define NODE_ENV=production, inclusive em preview)
+  // só o subdomínio vale.
+  if (process.env.NODE_ENV !== "production") {
     const header = req.header("x-tenant-slug");
     if (header) return header.trim().toLowerCase();
     const q = req.query.tenant;
