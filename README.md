@@ -10,8 +10,12 @@ Especificação completa em [`docs/`](docs/):
 
 ## Estado atual
 
-Fase 0 (fundação) + Fase 1 (isolamento por tenant) do roteiro do plano técnico (seção 15).
-Ainda sem auth de usuário (Fase 2) e sem telas de crédito (Fase 3+).
+Fases 0 a 2 do roteiro do plano técnico (seção 15): fundação, isolamento por tenant
+(RLS), e autenticação própria (e-mail+senha, sessão em tabela, papéis e permissões,
+convite). Ainda sem telas de crédito (Fase 3+).
+
+Login de dev (após `npm run seed:dev`): `admin@alpha.dev` / `Cred!x7i2026`, abrindo
+`http://localhost:5183/?tenant=alpha` (ou `?tenant=beta`).
 
 ## Estrutura
 
