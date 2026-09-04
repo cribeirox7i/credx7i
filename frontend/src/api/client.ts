@@ -93,6 +93,53 @@ export type Papel = {
   permissoes: Permissao[];
 };
 
+export type MunicipioHabilitado = {
+  municipio_habilitado_id: string;
+  municipio_ibge: string;
+  nome: string;
+  uf: string;
+  tipo: "SEDE" | "LIMITROFE";
+};
+export type AtividadeEconomica = {
+  atividade_economica_id: string;
+  codigo: string;
+  descricao: string;
+  segmento: "INDUSTRIA" | "COMERCIO" | "SERVICO" | "PUBLICO";
+};
+export type StatusCadastro = "RASCUNHO" | "EM_ANALISE" | "APROVADO" | "REPROVADO" | "SUSPENSO" | "BLOQUEADO";
+export type TipoTomador = "PJ" | "PJ_SIMPLES" | "MEI" | "PF" | "COOPERATIVA" | "ISENTO";
+export type Cedente = {
+  cedente_id: string;
+  cnpj: string;
+  razao_social: string;
+  nome_fantasia: string | null;
+  porte: "MEI" | "ME" | "EPP" | null;
+  tipo_tomador: TipoTomador;
+  status_cadastro: StatusCadastro;
+  municipio_ibge: string | null;
+  uf: string | null;
+  criado_em: string;
+};
+export type HistoricoStatusCedente = {
+  cedente_situacao_hist_id: string;
+  status_anterior: string | null;
+  status_novo: string;
+  observacao: string | null;
+  usuario_id: string | null;
+  ocorrido_em: string;
+};
+export type Sacado = {
+  sacado_id: string;
+  tipo_documento: "PF" | "PJ";
+  documento: string;
+  nome_razao_social: string;
+  limite_credito: number;
+  bloqueado: boolean;
+  municipio_ibge: string | null;
+  uf: string | null;
+  criado_em: string;
+};
+
 export const api = {
   health: () => req<{ ok: boolean }>("/health"),
   tenantAtual: () => req<TenantAtual>("/api/tenants/atual"),
@@ -139,4 +186,36 @@ export const api = {
   atualizarPapel: (id: string, dados: Partial<{ nome: string; adminTenant: boolean }>) =>
     req<void>(`/api/papeis/${id}`, { method: "PATCH", body: JSON.stringify(dados) }),
   excluirPapel: (id: string) => req<void>(`/api/papeis/${id}`, { method: "DELETE" }),
+
+  municipiosHabilitados: () => req<MunicipioHabilitado[]>("/api/municipios-habilitados"),
+  criarMunicipioHabilitado: (dados: { municipioIbge: string; nome: string; uf: string; tipo: "SEDE" | "LIMITROFE" }) =>
+    req<{ municipioHabilitadoId: string }>("/api/municipios-habilitados", {
+      method: "POST",
+      body: JSON.stringify(dados),
+    }),
+  atividadesEconomicas: () => req<AtividadeEconomica[]>("/api/atividades-economicas"),
+  criarAtividadeEconomica: (dados: { codigo: string; descricao: string; segmento: AtividadeEconomica["segmento"] }) =>
+    req<{ atividadeEconomicaId: string }>("/api/atividades-economicas", {
+      method: "POST",
+      body: JSON.stringify(dados),
+    }),
+
+  cedentes: () => req<Cedente[]>("/api/cedentes"),
+  criarCedente: (dados: { cnpj: string; razaoSocial: string; municipioIbge?: string; uf?: string }) =>
+    req<{ cedenteId: string }>("/api/cedentes", { method: "POST", body: JSON.stringify(dados) }),
+  atualizarCedente: (id: string, dados: Record<string, unknown>) =>
+    req<void>(`/api/cedentes/${id}`, { method: "PATCH", body: JSON.stringify(dados) }),
+  mudarStatusCedente: (id: string, statusNovo: StatusCadastro, observacao?: string) =>
+    req<void>(`/api/cedentes/${id}/status`, {
+      method: "POST",
+      body: JSON.stringify({ statusNovo, observacao }),
+    }),
+  historicoStatusCedente: (id: string) =>
+    req<HistoricoStatusCedente[]>(`/api/cedentes/${id}/historico-status`),
+
+  sacados: () => req<Sacado[]>("/api/sacados"),
+  criarSacado: (dados: { tipoDocumento: "PF" | "PJ"; documento: string; nomeRazaoSocial: string }) =>
+    req<{ sacadoId: string }>("/api/sacados", { method: "POST", body: JSON.stringify(dados) }),
+  atualizarSacado: (id: string, dados: Partial<{ limiteCredito: number; bloqueado: boolean }>) =>
+    req<void>(`/api/sacados/${id}`, { method: "PATCH", body: JSON.stringify(dados) }),
 };

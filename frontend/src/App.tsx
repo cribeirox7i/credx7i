@@ -7,6 +7,9 @@ import { AppShell } from "./shell/AppShell";
 import { InicioPage } from "./pages/InicioPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
 import { PapeisPage } from "./pages/PapeisPage";
+import { CedentesPage } from "./pages/CedentesPage";
+import { SacadosPage } from "./pages/SacadosPage";
+import { CadastrosApoioPage } from "./pages/CadastrosApoioPage";
 
 function Protegido({ children }: { children: React.ReactNode }) {
   const { estado } = useAuth();
@@ -39,6 +42,9 @@ export function App() {
             }
           >
             <Route index element={<InicioPage />} />
+            <Route path="cedentes" element={<CedentesPage />} />
+            <Route path="sacados" element={<SacadosPage />} />
+            <Route path="cadastros-apoio" element={<CadastrosApoioPage />} />
             <Route
               path="usuarios"
               element={

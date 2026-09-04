@@ -5,6 +5,9 @@ import { tenantContext } from "./tenantContext";
 import { tenantsRouter } from "./routes/tenants";
 import { authRouter } from "./routes/auth";
 import { usuariosRouter } from "./routes/usuarios";
+import { cadastrosApoioRouter } from "./routes/cadastrosApoio";
+import { cedentesRouter } from "./routes/cedentes";
+import { sacadosRouter } from "./routes/sacados";
 
 const app = express();
 app.disable("x-powered-by");
@@ -46,6 +49,12 @@ app.use("/api/auth", authRouter);
 
 // Administração do tenant (usuários, papéis, permissões) - o router exige sessão + admin.
 app.use("/api", usuariosRouter);
+
+// Fase 3b - cadastro de crédito (cedente, sacado, tabelas de apoio) - cada rota exige
+// sessão + a permissão do recurso (não é admin-only).
+app.use("/api", cadastrosApoioRouter);
+app.use("/api", cedentesRouter);
+app.use("/api", sacadosRouter);
 
 // Sob Vercel a variável VERCEL existe e o app é exportado como handler; local dev abre a porta.
 if (!process.env.VERCEL) {

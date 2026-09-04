@@ -57,7 +57,8 @@ export async function comContextoCommit<T>(
   }
 }
 
-// Tabelas de negócio da Fase 1. DEVE espelhar as listas de db/migrations/0004_rls.js.
+// Tabelas de negócio das Fases 1-3b. DEVE espelhar as listas de db/migrations/0004_rls.js
+// e db/migrations/0007_cadastros_credito.js.
 export const TABELAS_NEGOCIO = [
   "usuarios",
   "usuario_sessoes",
@@ -65,6 +66,11 @@ export const TABELAS_NEGOCIO = [
   "permissoes",
   "auditoria",
   "arquivos",
+  "municipio_habilitado",
+  "atividade_economica",
+  "cedente",
+  "cedente_situacao_hist",
+  "sacado",
 ] as const;
 
 // Tabelas do schema public que NÃO são de negócio (sem tenant_id / sem RLS por design):
@@ -76,6 +82,7 @@ export type SeedRefs = {
   slug: string;
   userId: string;
   papelId: string;
+  cedenteId: string;
 };
 
 /** Cria um tenant e uma linha conhecida em cada tabela de negócio. */
@@ -117,7 +124,30 @@ export async function semearTenant(slug: string): Promise<SeedRefs> {
       [tenantId, `${tenantId}/seed.pdf`],
     );
 
-    return { userId, papelId };
+    await c.query(
+      "INSERT INTO municipio_habilitado (tenant_id, municipio_ibge, nome, uf, tipo) VALUES ($1, '3550308', 'São Paulo', 'SP', 'SEDE')",
+      [tenantId],
+    );
+    const ae = await c.query<{ atividade_economica_id: string }>(
+      "INSERT INTO atividade_economica (tenant_id, codigo, descricao, segmento) VALUES ($1, '00.00-0', 'Seed', 'SERVICO') RETURNING atividade_economica_id",
+      [tenantId],
+    );
+    const cedenteRow = await c.query<{ cedente_id: string }>(
+      `INSERT INTO cedente (tenant_id, cnpj, razao_social, atividade_economica_id, municipio_ibge)
+       VALUES ($1, $2, 'Cedente Seed', $3, '3550308') RETURNING cedente_id`,
+      [tenantId, `cnpj-${slug}`, ae.rows[0].atividade_economica_id],
+    );
+    const cedenteId = cedenteRow.rows[0].cedente_id;
+    await c.query(
+      "INSERT INTO cedente_situacao_hist (tenant_id, cedente_id, status_novo, usuario_id) VALUES ($1, $2, 'RASCUNHO', $3)",
+      [tenantId, cedenteId, userId],
+    );
+    await c.query(
+      "INSERT INTO sacado (tenant_id, tipo_documento, documento, nome_razao_social) VALUES ($1, 'PJ', $2, 'Sacado Seed')",
+      [tenantId, `doc-${slug}`],
+    );
+
+    return { userId, papelId, cedenteId };
   });
 
   return { tenantId, slug, ...refs };
@@ -126,6 +156,11 @@ export async function semearTenant(slug: string): Promise<SeedRefs> {
 /** Apaga o tenant e todos os seus dados, na ordem de dependência. */
 export async function limparTenant(tenantId: string) {
   await comContextoCommit(adminPool, tenantId, async (c) => {
+    await c.query("DELETE FROM cedente_situacao_hist WHERE tenant_id = $1", [tenantId]);
+    await c.query("DELETE FROM sacado WHERE tenant_id = $1", [tenantId]);
+    await c.query("DELETE FROM cedente WHERE tenant_id = $1", [tenantId]);
+    await c.query("DELETE FROM atividade_economica WHERE tenant_id = $1", [tenantId]);
+    await c.query("DELETE FROM municipio_habilitado WHERE tenant_id = $1", [tenantId]);
     await c.query("DELETE FROM auditoria WHERE tenant_id = $1", [tenantId]);
     await c.query("DELETE FROM permissoes WHERE tenant_id = $1", [tenantId]);
     await c.query("DELETE FROM usuario_sessoes WHERE tenant_id = $1", [tenantId]);
@@ -159,7 +194,11 @@ export async function semearTenantComAdmin(
        VALUES ($1, 'Admin', $2, $3, $4, 'ATIVO', false) RETURNING user_id`,
       [tenantId, email, hashPassword(senha), papelId],
     );
-    return { userId: u.rows[0].user_id, papelId };
+    const cedenteRow = await c.query<{ cedente_id: string }>(
+      "INSERT INTO cedente (tenant_id, cnpj, razao_social) VALUES ($1, $2, 'Cedente Seed') RETURNING cedente_id",
+      [tenantId, `cnpj-${slug}`],
+    );
+    return { userId: u.rows[0].user_id, papelId, cedenteId: cedenteRow.rows[0].cedente_id };
   });
   return { tenantId, slug, ...refs };
 }
@@ -200,6 +239,31 @@ export function insertCruzado(
       return {
         sql: "INSERT INTO arquivos (tenant_id, chave, nome_original) VALUES ($1, $2, 'x.pdf')",
         params: [alvo.tenantId, `${alvo.tenantId}/cross.pdf`],
+      };
+    case "municipio_habilitado":
+      return {
+        sql: "INSERT INTO municipio_habilitado (tenant_id, municipio_ibge, nome, uf, tipo) VALUES ($1, $2, 'Cross', 'SP', 'SEDE')",
+        params: [alvo.tenantId, `cross-${alvo.slug}`],
+      };
+    case "atividade_economica":
+      return {
+        sql: "INSERT INTO atividade_economica (tenant_id, codigo, descricao, segmento) VALUES ($1, $2, 'Cross', 'SERVICO')",
+        params: [alvo.tenantId, `cross-${alvo.slug}`],
+      };
+    case "cedente":
+      return {
+        sql: "INSERT INTO cedente (tenant_id, cnpj, razao_social) VALUES ($1, $2, 'Cross')",
+        params: [alvo.tenantId, `cross-cnpj-${alvo.slug}`],
+      };
+    case "cedente_situacao_hist":
+      return {
+        sql: "INSERT INTO cedente_situacao_hist (tenant_id, cedente_id, status_novo) VALUES ($1, $2, 'RASCUNHO')",
+        params: [alvo.tenantId, alvo.cedenteId],
+      };
+    case "sacado":
+      return {
+        sql: "INSERT INTO sacado (tenant_id, tipo_documento, documento, nome_razao_social) VALUES ($1, 'PJ', $2, 'Cross')",
+        params: [alvo.tenantId, `cross-doc-${alvo.slug}`],
       };
     default:
       throw new Error(`insertCruzado sem caso para ${tabela}`);

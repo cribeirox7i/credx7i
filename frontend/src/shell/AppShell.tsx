@@ -4,7 +4,7 @@ import { api, type TenantAtual } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
 export function AppShell() {
-  const { estado, logout } = useAuth();
+  const { estado, logout, pode } = useAuth();
   const nav = useNavigate();
   const [tenant, setTenant] = useState<TenantAtual | null>(null);
 
@@ -23,6 +23,11 @@ export function AppShell() {
           <NavLink to="/" end>
             Início
           </NavLink>
+          {(estado.adminTenant || pode("cedente", "leitura")) && <NavLink to="/cedentes">Cedentes</NavLink>}
+          {(estado.adminTenant || pode("sacado", "leitura")) && <NavLink to="/sacados">Sacados</NavLink>}
+          {(estado.adminTenant || pode("tabela_apoio", "leitura")) && (
+            <NavLink to="/cadastros-apoio">Cadastros de apoio</NavLink>
+          )}
           {estado.adminTenant && (
             <>
               <NavLink to="/usuarios">Usuários</NavLink>
