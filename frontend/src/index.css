@@ -223,6 +223,45 @@ select {
   background: var(--surface);
 }
 
+.grupo-nav {
+  margin-top: 6px;
+}
+.grupo-nav-titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  cursor: pointer;
+  text-align: left;
+}
+.grupo-nav-titulo:hover {
+  color: var(--text);
+}
+.grupo-nav-seta {
+  display: inline-block;
+  font-size: 9px;
+  transition: transform 0.12s ease;
+}
+.grupo-nav-titulo.aberto .grupo-nav-seta {
+  transform: rotate(90deg);
+}
+.grupo-nav-itens {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.grupo-nav-itens a {
+  padding-left: 20px;
+}
+
 .area-principal {
   display: flex;
   flex-direction: column;
