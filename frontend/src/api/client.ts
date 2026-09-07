@@ -140,6 +140,83 @@ export type Sacado = {
   criado_em: string;
 };
 
+export type Enquadramento = "PADRAO" | "PNMPO" | "RURAL" | "HABITACIONAL" | "EXPORTACAO" | "RENEGOCIACAO";
+export type IofTabelaLinha = {
+  iof_tabela_id: string;
+  tipo_tomador: TipoTomador;
+  enquadramento: Enquadramento;
+  vigencia_inicio: string;
+  vigencia_fim: string | null;
+  aliquota_dia: number;
+  aliquota_dia_reduzida: number;
+  teto_valor_reducao: number;
+  aliquota_adicional: number;
+  teto_dias: number;
+  isencao_total: boolean;
+};
+export type TributoTabelaLinha = {
+  tributo_receita_tabela_id: string;
+  tipo_tomador: TipoTomador;
+  enquadramento: Enquadramento;
+  tributo: "IRRF" | "PIS" | "COFINS";
+  aliquota: number;
+  vigencia_inicio: string;
+  vigencia_fim: string | null;
+};
+export type TabelaCustoItem = { tabela_custo_item_id: string; nome: string; valor: number };
+export type TabelaCusto = {
+  tabela_custo_id: string;
+  nome: string;
+  padrao: boolean;
+  itens: TabelaCustoItem[];
+};
+
+export type Proposta = {
+  proposta_id: string;
+  cedente_id: string;
+  cedente_razao_social: string;
+  modalidade: string;
+  sistema_amortizacao: "PRICE" | "SAC";
+  taxa_prefixada: number | null;
+  valor_parcela_informado: number | null;
+  valor_solicitado: number;
+  n_parcelas: number;
+  carencia_periodos: number;
+  data_liberacao: string;
+  tratamento_iof: "FINANCIADO" | "DESCONTADO";
+  enquadramento_iof: Enquadramento;
+  tabela_custo_id: string | null;
+  status: string;
+  simulado_em: string | null;
+  criado_em: string;
+};
+export type ParcelaSimulada = {
+  numero: number;
+  vencimentoNominal: string;
+  vencimento: string;
+  diasCorridos: number;
+  prestacao: number;
+  amortizacao: number;
+  juros: number;
+  saldoDevedor: number;
+  iofPrincipal: number;
+};
+export type ResultadoSimulacao = {
+  taxaPeriodo: number;
+  taxaResolvidaPorInversao: boolean;
+  valorPrincipalFinanciado: number;
+  parcelas: ParcelaSimulada[];
+  iofAdicional: number;
+  iofPrincipalTotal: number;
+  iofTotal: number;
+  tributosDetalhe: { tributo: string; base: number; aliquota: number; valor: number }[];
+  tributosTotal: number;
+  custosTotal: number;
+  valorDesembolso: number;
+  cet: number;
+  cetConvergiu: boolean;
+};
+
 export const api = {
   health: () => req<{ ok: boolean }>("/health"),
   tenantAtual: () => req<TenantAtual>("/api/tenants/atual"),
@@ -218,4 +295,53 @@ export const api = {
     req<{ sacadoId: string }>("/api/sacados", { method: "POST", body: JSON.stringify(dados) }),
   atualizarSacado: (id: string, dados: Partial<{ limiteCredito: number; bloqueado: boolean }>) =>
     req<void>(`/api/sacados/${id}`, { method: "PATCH", body: JSON.stringify(dados) }),
+
+  iofTabela: () => req<IofTabelaLinha[]>("/api/iof-tabela"),
+  criarLinhaIof: (dados: {
+    tipoTomador: TipoTomador;
+    enquadramento: Enquadramento;
+    vigenciaInicio: string;
+    aliquotaDia: number;
+    aliquotaDiaReduzida: number;
+    tetoValorReducao: number;
+    aliquotaAdicional: number;
+    tetoDias: number;
+    isencaoTotal?: boolean;
+  }) => req<{ iofTabelaId: string }>("/api/iof-tabela", { method: "POST", body: JSON.stringify(dados) }),
+
+  tributosTabela: () => req<TributoTabelaLinha[]>("/api/tributos-tabela"),
+  criarLinhaTributo: (dados: {
+    tipoTomador: TipoTomador;
+    enquadramento: Enquadramento;
+    tributo: "IRRF" | "PIS" | "COFINS";
+    aliquota: number;
+    vigenciaInicio: string;
+  }) => req<{ tributoReceitaTabelaId: string }>("/api/tributos-tabela", { method: "POST", body: JSON.stringify(dados) }),
+
+  tabelasCusto: () => req<TabelaCusto[]>("/api/tabelas-custo"),
+  criarTabelaCusto: (dados: { nome: string; padrao?: boolean; itens: { nome: string; valor: number }[] }) =>
+    req<{ tabelaCustoId: string }>("/api/tabelas-custo", { method: "POST", body: JSON.stringify(dados) }),
+  marcarTabelaCustoPadrao: (id: string) =>
+    req<void>(`/api/tabelas-custo/${id}`, { method: "PATCH", body: JSON.stringify({ padrao: true }) }),
+
+  propostas: () => req<Proposta[]>("/api/propostas"),
+  proposta: (id: string) => req<Proposta>(`/api/propostas/${id}`),
+  criarProposta: (dados: {
+    cedenteId: string;
+    modalidade: string;
+    sistemaAmortizacao: "PRICE" | "SAC";
+    taxaPrefixada?: number | null;
+    valorParcelaInformado?: number | null;
+    valorSolicitado: number;
+    nParcelas: number;
+    carenciaPeriodos: number;
+    dataLiberacao: string;
+    tratamentoIof: "FINANCIADO" | "DESCONTADO";
+    enquadramentoIof: Enquadramento;
+    tabelaCustoId?: string | null;
+  }) => req<{ propostaId: string }>("/api/propostas", { method: "POST", body: JSON.stringify(dados) }),
+  atualizarProposta: (id: string, dados: Record<string, unknown>) =>
+    req<void>(`/api/propostas/${id}`, { method: "PATCH", body: JSON.stringify(dados) }),
+  simularProposta: (id: string) =>
+    req<ResultadoSimulacao>(`/api/propostas/${id}/simular`, { method: "POST" }),
 };

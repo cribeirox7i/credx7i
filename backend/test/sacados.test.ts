@@ -8,8 +8,14 @@ const SENHA = "Cred!x7i2026";
 let alpha: SeedRefs;
 let tokenAlpha: string;
 
+// IP próprio por execução: o rate_limit persiste no banco entre runs, e um IP fixo
+// somaria os logins de execuções seguidas dentro da janela de 15 min e estouraria o limite.
+const IP_SUITE = `203.0.113.${Math.floor(Math.random() * 250) + 1}`;
+
 function api(method: "get" | "post" | "patch", path: string) {
-  return (request(app) as unknown as Record<string, (p: string) => request.Test>)[method](path);
+  return (request(app) as unknown as Record<string, (p: string) => request.Test>)
+    [method](path)
+    .set("X-Forwarded-For", IP_SUITE);
 }
 
 async function logar(slug: string, email: string): Promise<string> {

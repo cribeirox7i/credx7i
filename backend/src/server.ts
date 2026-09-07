@@ -8,6 +8,8 @@ import { usuariosRouter } from "./routes/usuarios";
 import { cadastrosApoioRouter } from "./routes/cadastrosApoio";
 import { cedentesRouter } from "./routes/cedentes";
 import { sacadosRouter } from "./routes/sacados";
+import { parametrosFiscaisRouter } from "./routes/parametrosFiscais";
+import { propostasRouter } from "./routes/propostas";
 
 const app = express();
 app.disable("x-powered-by");
@@ -55,6 +57,10 @@ app.use("/api", usuariosRouter);
 app.use("/api", cadastrosApoioRouter);
 app.use("/api", cedentesRouter);
 app.use("/api", sacadosRouter);
+
+// Fase 3c - parâmetros fiscais + proposta (a proposta é quem chama o motor de cálculo).
+app.use("/api", parametrosFiscaisRouter);
+app.use("/api", propostasRouter);
 
 // Sob Vercel a variável VERCEL existe e o app é exportado como handler; local dev abre a porta.
 if (!process.env.VERCEL) {

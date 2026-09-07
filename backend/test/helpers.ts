@@ -57,8 +57,8 @@ export async function comContextoCommit<T>(
   }
 }
 
-// Tabelas de negócio das Fases 1-3b. DEVE espelhar as listas de db/migrations/0004_rls.js
-// e db/migrations/0007_cadastros_credito.js.
+// Tabelas de negócio das Fases 1-3c. DEVE espelhar as listas de db/migrations/0004_rls.js,
+// 0007_cadastros_credito.js e 0008_parametros_fiscais_proposta.js.
 export const TABELAS_NEGOCIO = [
   "usuarios",
   "usuario_sessoes",
@@ -71,6 +71,11 @@ export const TABELAS_NEGOCIO = [
   "cedente",
   "cedente_situacao_hist",
   "sacado",
+  "iof_tabela",
+  "tributo_receita_tabela",
+  "tabela_custo",
+  "tabela_custo_item",
+  "proposta",
 ] as const;
 
 // Tabelas do schema public que NÃO são de negócio (sem tenant_id / sem RLS por design):
@@ -83,6 +88,7 @@ export type SeedRefs = {
   userId: string;
   papelId: string;
   cedenteId: string;
+  tabelaCustoId: string;
 };
 
 /** Cria um tenant e uma linha conhecida em cada tabela de negócio. */
@@ -147,7 +153,33 @@ export async function semearTenant(slug: string): Promise<SeedRefs> {
       [tenantId, `doc-${slug}`],
     );
 
-    return { userId, papelId, cedenteId };
+    await c.query(
+      `INSERT INTO iof_tabela (tenant_id, tipo_tomador, enquadramento, vigencia_inicio, aliquota_dia, aliquota_adicional, teto_dias)
+       VALUES ($1, 'PJ', 'PADRAO', '2020-01-01', 0.000082, 0.0038, 365)`,
+      [tenantId],
+    );
+    await c.query(
+      `INSERT INTO tributo_receita_tabela (tenant_id, tipo_tomador, enquadramento, tributo, aliquota, vigencia_inicio)
+       VALUES ($1, 'PJ', 'PADRAO', 'IRRF', 0.005, '2020-01-01')`,
+      [tenantId],
+    );
+    const tc = await c.query<{ tabela_custo_id: string }>(
+      "INSERT INTO tabela_custo (tenant_id, nome, padrao) VALUES ($1, 'Seed', true) RETURNING tabela_custo_id",
+      [tenantId],
+    );
+    const tabelaCustoId = tc.rows[0].tabela_custo_id;
+    await c.query(
+      "INSERT INTO tabela_custo_item (tenant_id, tabela_custo_id, nome, valor) VALUES ($1, $2, 'TED', 10)",
+      [tenantId, tabelaCustoId],
+    );
+    await c.query(
+      `INSERT INTO proposta (tenant_id, cedente_id, modalidade, sistema_amortizacao, taxa_prefixada,
+                              valor_solicitado, n_parcelas, data_liberacao, tratamento_iof, tabela_custo_id)
+       VALUES ($1, $2, 'Seed', 'PRICE', 0.02, 10000, 12, '2026-01-15', 'DESCONTADO', $3)`,
+      [tenantId, cedenteId, tabelaCustoId],
+    );
+
+    return { userId, papelId, cedenteId, tabelaCustoId };
   });
 
   return { tenantId, slug, ...refs };
@@ -156,6 +188,11 @@ export async function semearTenant(slug: string): Promise<SeedRefs> {
 /** Apaga o tenant e todos os seus dados, na ordem de dependência. */
 export async function limparTenant(tenantId: string) {
   await comContextoCommit(adminPool, tenantId, async (c) => {
+    await c.query("DELETE FROM proposta WHERE tenant_id = $1", [tenantId]);
+    await c.query("DELETE FROM tabela_custo_item WHERE tenant_id = $1", [tenantId]);
+    await c.query("DELETE FROM tabela_custo WHERE tenant_id = $1", [tenantId]);
+    await c.query("DELETE FROM tributo_receita_tabela WHERE tenant_id = $1", [tenantId]);
+    await c.query("DELETE FROM iof_tabela WHERE tenant_id = $1", [tenantId]);
     await c.query("DELETE FROM cedente_situacao_hist WHERE tenant_id = $1", [tenantId]);
     await c.query("DELETE FROM sacado WHERE tenant_id = $1", [tenantId]);
     await c.query("DELETE FROM cedente WHERE tenant_id = $1", [tenantId]);
@@ -198,7 +235,16 @@ export async function semearTenantComAdmin(
       "INSERT INTO cedente (tenant_id, cnpj, razao_social) VALUES ($1, $2, 'Cedente Seed') RETURNING cedente_id",
       [tenantId, `cnpj-${slug}`],
     );
-    return { userId: u.rows[0].user_id, papelId, cedenteId: cedenteRow.rows[0].cedente_id };
+    const tc = await c.query<{ tabela_custo_id: string }>(
+      "INSERT INTO tabela_custo (tenant_id, nome, padrao) VALUES ($1, 'Seed', true) RETURNING tabela_custo_id",
+      [tenantId],
+    );
+    return {
+      userId: u.rows[0].user_id,
+      papelId,
+      cedenteId: cedenteRow.rows[0].cedente_id,
+      tabelaCustoId: tc.rows[0].tabela_custo_id,
+    };
   });
   return { tenantId, slug, ...refs };
 }
@@ -264,6 +310,35 @@ export function insertCruzado(
       return {
         sql: "INSERT INTO sacado (tenant_id, tipo_documento, documento, nome_razao_social) VALUES ($1, 'PJ', $2, 'Cross')",
         params: [alvo.tenantId, `cross-doc-${alvo.slug}`],
+      };
+    case "iof_tabela":
+      return {
+        sql: `INSERT INTO iof_tabela (tenant_id, tipo_tomador, enquadramento, vigencia_inicio, aliquota_dia, aliquota_adicional, teto_dias)
+              VALUES ($1, 'PJ', 'PADRAO', '2020-01-01', 0, 0, 365)`,
+        params: [alvo.tenantId],
+      };
+    case "tributo_receita_tabela":
+      return {
+        sql: `INSERT INTO tributo_receita_tabela (tenant_id, tipo_tomador, enquadramento, tributo, aliquota, vigencia_inicio)
+              VALUES ($1, 'PJ', 'PADRAO', 'IRRF', 0, '2020-01-01')`,
+        params: [alvo.tenantId],
+      };
+    case "tabela_custo":
+      return {
+        sql: "INSERT INTO tabela_custo (tenant_id, nome) VALUES ($1, 'Cross')",
+        params: [alvo.tenantId],
+      };
+    case "tabela_custo_item":
+      return {
+        sql: "INSERT INTO tabela_custo_item (tenant_id, tabela_custo_id, nome, valor) VALUES ($1, $2, 'Cross', 0)",
+        params: [alvo.tenantId, alvo.tabelaCustoId],
+      };
+    case "proposta":
+      return {
+        sql: `INSERT INTO proposta (tenant_id, cedente_id, modalidade, sistema_amortizacao, taxa_prefixada,
+                                     valor_solicitado, n_parcelas, data_liberacao, tratamento_iof)
+              VALUES ($1, $2, 'Cross', 'PRICE', 0.02, 1000, 1, '2026-01-15', 'DESCONTADO')`,
+        params: [alvo.tenantId, alvo.cedenteId],
       };
     default:
       throw new Error(`insertCruzado sem caso para ${tabela}`);

@@ -10,6 +10,8 @@ import { PapeisPage } from "./pages/PapeisPage";
 import { CedentesPage } from "./pages/CedentesPage";
 import { SacadosPage } from "./pages/SacadosPage";
 import { CadastrosApoioPage } from "./pages/CadastrosApoioPage";
+import { PropostasPage } from "./pages/PropostasPage";
+import { ParametrosFiscaisPage } from "./pages/ParametrosFiscaisPage";
 
 function Protegido({ children }: { children: React.ReactNode }) {
   const { estado } = useAuth();
@@ -45,6 +47,8 @@ export function App() {
             <Route path="cedentes" element={<CedentesPage />} />
             <Route path="sacados" element={<SacadosPage />} />
             <Route path="cadastros-apoio" element={<CadastrosApoioPage />} />
+            <Route path="propostas" element={<PropostasPage />} />
+            <Route path="parametros-fiscais" element={<ParametrosFiscaisPage />} />
             <Route
               path="usuarios"
               element={

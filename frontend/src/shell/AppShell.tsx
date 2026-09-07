@@ -25,8 +25,12 @@ export function AppShell() {
           </NavLink>
           {(estado.adminTenant || pode("cedente", "leitura")) && <NavLink to="/cedentes">Cedentes</NavLink>}
           {(estado.adminTenant || pode("sacado", "leitura")) && <NavLink to="/sacados">Sacados</NavLink>}
+          {(estado.adminTenant || pode("proposta", "leitura")) && <NavLink to="/propostas">Propostas</NavLink>}
           {(estado.adminTenant || pode("tabela_apoio", "leitura")) && (
             <NavLink to="/cadastros-apoio">Cadastros de apoio</NavLink>
+          )}
+          {(estado.adminTenant || pode("parametro_fiscal", "leitura")) && (
+            <NavLink to="/parametros-fiscais">Parâmetros fiscais</NavLink>
           )}
           {estado.adminTenant && (
             <>
