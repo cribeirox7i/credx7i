@@ -186,8 +186,11 @@ export type Proposta = {
   tratamento_iof: "FINANCIADO" | "DESCONTADO";
   enquadramento_iof: Enquadramento;
   tabela_custo_id: string | null;
-  status: string;
+  status: "RASCUNHO" | "DEFERIDA" | "REPROVADA";
   simulado_em: string | null;
+  decidido_em: string | null;
+  decidido_por: string | null;
+  motivo_reprovacao: string | null;
   criado_em: string;
 };
 export type ParcelaSimulada = {
@@ -344,4 +347,10 @@ export const api = {
     req<void>(`/api/propostas/${id}`, { method: "PATCH", body: JSON.stringify(dados) }),
   simularProposta: (id: string) =>
     req<ResultadoSimulacao>(`/api/propostas/${id}/simular`, { method: "POST" }),
+  deferirProposta: (id: string) => req<void>(`/api/propostas/${id}/deferir`, { method: "POST" }),
+  reprovarProposta: (id: string, motivoReprovacao?: string) =>
+    req<void>(`/api/propostas/${id}/reprovar`, {
+      method: "POST",
+      body: JSON.stringify({ motivoReprovacao }),
+    }),
 };

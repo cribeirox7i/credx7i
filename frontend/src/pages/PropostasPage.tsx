@@ -35,6 +35,8 @@ export function PropostasPage() {
 
   const [simulando, setSimulando] = useState<string | null>(null);
   const [resultados, setResultados] = useState<Record<string, ResultadoSimulacao>>({});
+  const [decidindo, setDecidindo] = useState<string | null>(null);
+  const [motivos, setMotivos] = useState<Record<string, string>>({});
 
   const carregar = useCallback(async () => {
     setErro(null);
@@ -90,6 +92,32 @@ export function PropostasPage() {
       setErro(e instanceof Error ? e.message : "falha ao simular");
     } finally {
       setSimulando(null);
+    }
+  }
+
+  async function deferir(p: Proposta) {
+    setErro(null);
+    setDecidindo(p.proposta_id);
+    try {
+      await api.deferirProposta(p.proposta_id);
+      await carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "falha ao deferir");
+    } finally {
+      setDecidindo(null);
+    }
+  }
+
+  async function reprovar(p: Proposta) {
+    setErro(null);
+    setDecidindo(p.proposta_id);
+    try {
+      await api.reprovarProposta(p.proposta_id, motivos[p.proposta_id] || undefined);
+      await carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "falha ao reprovar");
+    } finally {
+      setDecidindo(null);
     }
   }
 
@@ -172,6 +200,7 @@ export function PropostasPage() {
             <th>Sistema</th>
             <th>Valor</th>
             <th>Parcelas</th>
+            <th>Status</th>
             <th>Simulada em</th>
             <th></th>
           </tr>
@@ -184,11 +213,40 @@ export function PropostasPage() {
               <td>{p.sistema_amortizacao}</td>
               <td>{moeda(Number(p.valor_solicitado))}</td>
               <td>{p.n_parcelas}</td>
+              <td>{p.status}</td>
               <td>{p.simulado_em ? new Date(p.simulado_em).toLocaleString("pt-BR") : "-"}</td>
               <td>
-                <button className="link" onClick={() => simular(p)} disabled={simulando === p.proposta_id}>
-                  {simulando === p.proposta_id ? "simulando..." : "simular"}
-                </button>
+                {p.status === "RASCUNHO" ? (
+                  <>
+                    <button className="link" onClick={() => simular(p)} disabled={simulando === p.proposta_id}>
+                      {simulando === p.proposta_id ? "simulando..." : "simular"}
+                    </button>
+                    {" · "}
+                    <button
+                      className="link"
+                      onClick={() => deferir(p)}
+                      disabled={decidindo === p.proposta_id || !p.simulado_em}
+                      title={!p.simulado_em ? "simule antes de deferir" : undefined}
+                    >
+                      deferir
+                    </button>
+                    {" · "}
+                    <input
+                      placeholder="motivo (se reprovar)"
+                      value={motivos[p.proposta_id] ?? ""}
+                      onChange={(e) => setMotivos((m) => ({ ...m, [p.proposta_id]: e.target.value }))}
+                      style={{ width: 140 }}
+                    />
+                    <button className="link" onClick={() => reprovar(p)} disabled={decidindo === p.proposta_id}>
+                      reprovar
+                    </button>
+                  </>
+                ) : (
+                  <span>
+                    {p.decidido_em && new Date(p.decidido_em).toLocaleString("pt-BR")}
+                    {p.motivo_reprovacao && ` — ${p.motivo_reprovacao}`}
+                  </span>
+                )}
               </td>
             </tr>
           ))}

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { PoolClient } from "pg";
 import { withTenant } from "../db";
 import { requireUserAuth } from "../auth";
 import { exigePermissao } from "../permissao";
@@ -44,7 +45,8 @@ propostasRouter.get("/propostas", exigePermissao("proposta", "leitura"), async (
     const r = await c.query(
       `SELECT p.proposta_id, p.cedente_id, ced.razao_social AS cedente_razao_social,
               p.modalidade, p.sistema_amortizacao, p.valor_solicitado, p.n_parcelas,
-              p.status, p.simulado_em, p.criado_em
+              p.status, p.simulado_em, p.decidido_em, p.decidido_por, p.motivo_reprovacao,
+              p.criado_em
          FROM proposta p
          JOIN cedente ced ON ced.cedente_id = p.cedente_id
         ORDER BY p.criado_em DESC`,
@@ -102,6 +104,12 @@ propostasRouter.post("/propostas", exigePermissao("proposta", "inclusao"), async
 
 const patchProposta = objetoProposta.partial();
 
+/** RN-19: proposta decidida (DEFERIDA/REPROVADA) é imutável. */
+async function buscarStatus(c: PoolClient, propostaId: string): Promise<string | null> {
+  const r = await c.query<{ status: string }>("SELECT status FROM proposta WHERE proposta_id = $1", [propostaId]);
+  return r.rows[0]?.status ?? null;
+}
+
 propostasRouter.patch("/propostas/:id", exigePermissao("proposta", "edicao"), async (req, res) => {
   const parsed = patchProposta.safeParse(req.body);
   if (!parsed.success || Object.keys(parsed.data).length === 0) {
@@ -109,7 +117,11 @@ propostasRouter.patch("/propostas/:id", exigePermissao("proposta", "edicao"), as
     return;
   }
   try {
-    const n = await withTenant(req.tenantId!, async (c) => {
+    const resultado = await withTenant(req.tenantId!, async (c) => {
+      const status = await buscarStatus(c, req.params.id);
+      if (status === null) return { tipo: "NAO_ENCONTRADA" as const };
+      if (status !== "RASCUNHO") return { tipo: "IMUTAVEL" as const };
+
       const campos: string[] = [];
       const valores: unknown[] = [];
       for (const [k, v] of Object.entries(parsed.data)) {
@@ -117,14 +129,18 @@ propostasRouter.patch("/propostas/:id", exigePermissao("proposta", "edicao"), as
         valores.push(v);
       }
       valores.push(req.params.id);
-      const r = await c.query(
+      await c.query(
         `UPDATE proposta SET ${campos.join(", ")} WHERE proposta_id = $${valores.length}`,
         valores,
       );
-      return r.rowCount ?? 0;
+      return { tipo: "OK" as const };
     });
-    if (n === 0) {
+    if (resultado.tipo === "NAO_ENCONTRADA") {
       res.status(404).json({ error: "proposta não encontrada" });
+      return;
+    }
+    if (resultado.tipo === "IMUTAVEL") {
+      res.status(409).json({ error: "proposta já decidida - imutável (RN-19)" });
       return;
     }
     res.status(204).send();
@@ -148,6 +164,7 @@ propostasRouter.post(
         const p = await c.query("SELECT * FROM proposta WHERE proposta_id = $1", [req.params.id]);
         const proposta = p.rows[0];
         if (!proposta) return { tipo: "NAO_ENCONTRADA" as const };
+        if (proposta.status !== "RASCUNHO") return { tipo: "IMUTAVEL" as const };
 
         const ced = await c.query<{ tipo_tomador: TipoTomador }>(
           "SELECT tipo_tomador FROM cedente WHERE cedente_id = $1",
@@ -194,6 +211,10 @@ propostasRouter.post(
         res.status(404).json({ error: "proposta não encontrada" });
         return;
       }
+      if (resultado.tipo === "IMUTAVEL") {
+        res.status(409).json({ error: "proposta já decidida - imutável (RN-19)" });
+        return;
+      }
       res.json(resultado.saida);
     } catch (e) {
       if (e instanceof SemParametroFiscalError) {
@@ -201,6 +222,103 @@ propostasRouter.post(
         return;
       }
       res.status(500).json({ error: "não foi possível simular a proposta" });
+    }
+  },
+);
+
+// ------------------------------------------------------------- deferir/reprovar
+
+propostasRouter.post(
+  "/propostas/:id/deferir",
+  exigePermissao("proposta", "edicao"),
+  async (req, res) => {
+    try {
+      const resultado = await withTenant(req.tenantId!, async (c) => {
+        const r = await c.query<{
+          status: string;
+          simulacao_snapshot: unknown;
+          cedente_status: string;
+        }>(
+          `SELECT p.status, p.simulacao_snapshot, ced.status_cadastro AS cedente_status
+             FROM proposta p
+             JOIN cedente ced ON ced.cedente_id = p.cedente_id
+            WHERE p.proposta_id = $1`,
+          [req.params.id],
+        );
+        const row = r.rows[0];
+        if (!row) return { tipo: "NAO_ENCONTRADA" as const };
+        if (row.status !== "RASCUNHO") return { tipo: "IMUTAVEL" as const };
+        if (row.simulacao_snapshot == null) return { tipo: "SEM_SIMULACAO" as const };
+        if (row.cedente_status !== "APROVADO") return { tipo: "CEDENTE_NAO_APROVADO" as const };
+
+        await c.query(
+          `UPDATE proposta SET status = 'DEFERIDA', decidido_em = now(), decidido_por = $1
+            WHERE proposta_id = $2`,
+          [req.usuario!.userId, req.params.id],
+        );
+        return { tipo: "OK" as const };
+      });
+
+      switch (resultado.tipo) {
+        case "NAO_ENCONTRADA":
+          res.status(404).json({ error: "proposta não encontrada" });
+          return;
+        case "IMUTAVEL":
+          res.status(409).json({ error: "proposta já decidida - imutável (RN-19)" });
+          return;
+        case "SEM_SIMULACAO":
+          res.status(422).json({ error: "simule a proposta antes de deferir" });
+          return;
+        case "CEDENTE_NAO_APROVADO":
+          res.status(400).json({ error: "só é possível deferir proposta de cedente com status APROVADO (RN-10)" });
+          return;
+        case "OK":
+          res.status(204).send();
+          return;
+      }
+    } catch {
+      res.status(500).json({ error: "não foi possível deferir a proposta" });
+    }
+  },
+);
+
+const reprovarBody = z.object({ motivoReprovacao: z.string().optional() });
+
+propostasRouter.post(
+  "/propostas/:id/reprovar",
+  exigePermissao("proposta", "edicao"),
+  async (req, res) => {
+    const parsed = reprovarBody.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "motivo de reprovação inválido" });
+      return;
+    }
+    try {
+      const resultado = await withTenant(req.tenantId!, async (c) => {
+        const status = await buscarStatus(c, req.params.id);
+        if (status === null) return { tipo: "NAO_ENCONTRADA" as const };
+        if (status !== "RASCUNHO") return { tipo: "IMUTAVEL" as const };
+
+        await c.query(
+          `UPDATE proposta
+              SET status = 'REPROVADA', decidido_em = now(), decidido_por = $1, motivo_reprovacao = $2
+            WHERE proposta_id = $3`,
+          [req.usuario!.userId, parsed.data.motivoReprovacao ?? null, req.params.id],
+        );
+        return { tipo: "OK" as const };
+      });
+
+      if (resultado.tipo === "NAO_ENCONTRADA") {
+        res.status(404).json({ error: "proposta não encontrada" });
+        return;
+      }
+      if (resultado.tipo === "IMUTAVEL") {
+        res.status(409).json({ error: "proposta já decidida - imutável (RN-19)" });
+        return;
+      }
+      res.status(204).send();
+    } catch {
+      res.status(500).json({ error: "não foi possível reprovar a proposta" });
     }
   },
 );

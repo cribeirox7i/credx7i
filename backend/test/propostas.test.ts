@@ -166,3 +166,66 @@ describe("propostas", () => {
     expect(viaBeta.status).toBe(404);
   });
 });
+
+describe("deferimento (Fase 3d fatiada)", () => {
+  it("deferir sem simular ainda -> 422", async () => {
+    const criar = await comoAlpha(api("post", "/api/propostas")).send(dadosProposta());
+    const propostaId = criar.body.propostaId as string;
+
+    const deferir = await comoAlpha(api("post", `/api/propostas/${propostaId}/deferir`));
+    expect(deferir.status).toBe(422);
+  });
+
+  it("RN-10: deferir com cedente não APROVADO -> 400", async () => {
+    const criar = await comoAlpha(api("post", "/api/propostas")).send(dadosProposta());
+    const propostaId = criar.body.propostaId as string;
+    await comoAlpha(api("post", `/api/propostas/${propostaId}/simular`));
+
+    // cedente do seed nasce em RASCUNHO (nunca foi aprovado nesta suíte).
+    const deferir = await comoAlpha(api("post", `/api/propostas/${propostaId}/deferir`));
+    expect(deferir.status).toBe(400);
+    expect(deferir.body.error).toMatch(/RN-10|APROVADO/);
+  });
+
+  it("defere com sucesso (cedente aprovado + proposta simulada) e trava edição/simulação depois (RN-19)", async () => {
+    await comoAlpha(api("post", `/api/cedentes/${alpha.cedenteId}/status`)).send({ statusNovo: "APROVADO" });
+
+    const criar = await comoAlpha(api("post", "/api/propostas")).send(dadosProposta());
+    const propostaId = criar.body.propostaId as string;
+    await comoAlpha(api("post", `/api/propostas/${propostaId}/simular`));
+
+    const deferir = await comoAlpha(api("post", `/api/propostas/${propostaId}/deferir`));
+    expect(deferir.status).toBe(204);
+
+    const detalhe = await comoAlpha(api("get", `/api/propostas/${propostaId}`));
+    expect(detalhe.body.status).toBe("DEFERIDA");
+    expect(detalhe.body.decidido_em).not.toBeNull();
+    expect(detalhe.body.decidido_por).not.toBeNull();
+
+    const editar = await comoAlpha(api("patch", `/api/propostas/${propostaId}`)).send({ valorSolicitado: 1 });
+    expect(editar.status).toBe(409);
+
+    const resimular = await comoAlpha(api("post", `/api/propostas/${propostaId}/simular`));
+    expect(resimular.status).toBe(409);
+
+    const rederferir = await comoAlpha(api("post", `/api/propostas/${propostaId}/deferir`));
+    expect(rederferir.status).toBe(409);
+  });
+
+  it("reprova sem precisar simular, grava o motivo, e também trava depois (RN-19)", async () => {
+    const criar = await comoAlpha(api("post", "/api/propostas")).send(dadosProposta());
+    const propostaId = criar.body.propostaId as string;
+
+    const reprovar = await comoAlpha(api("post", `/api/propostas/${propostaId}/reprovar`)).send({
+      motivoReprovacao: "documentação incompleta",
+    });
+    expect(reprovar.status).toBe(204);
+
+    const detalhe = await comoAlpha(api("get", `/api/propostas/${propostaId}`));
+    expect(detalhe.body.status).toBe("REPROVADA");
+    expect(detalhe.body.motivo_reprovacao).toBe("documentação incompleta");
+
+    const editar = await comoAlpha(api("patch", `/api/propostas/${propostaId}`)).send({ valorSolicitado: 1 });
+    expect(editar.status).toBe(409);
+  });
+});
