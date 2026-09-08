@@ -15,28 +15,31 @@ function camelParaSnake(s: string): string {
   return s.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
 }
 
+// Campos opcionais aceitam null (não só undefined): a tela de edição manda null pra
+// limpar um campo em branco - só os NOT NULL do banco (tipoTomador, declara* etc.)
+// ficam de fora do .nullable().
 const camposCedente = z.object({
   cnpj: z.string().min(1),
   razaoSocial: z.string().min(1),
-  nomeFantasia: z.string().optional(),
+  nomeFantasia: z.string().nullable().optional(),
   porte: z.enum(["MEI", "ME", "EPP"]).nullable().optional(),
-  dataAbertura: z.string().optional(),
+  dataAbertura: z.string().nullable().optional(),
   atividadeEconomicaId: z.string().uuid().nullable().optional(),
-  logradouro: z.string().optional(),
-  numero: z.string().optional(),
-  complemento: z.string().optional(),
-  bairro: z.string().optional(),
-  cep: z.string().optional(),
-  municipioIbge: z.string().optional(),
-  uf: z.string().length(2).optional(),
-  telefone: z.string().optional(),
-  celular: z.string().optional(),
-  email: z.string().email().optional(),
+  logradouro: z.string().nullable().optional(),
+  numero: z.string().nullable().optional(),
+  complemento: z.string().nullable().optional(),
+  bairro: z.string().nullable().optional(),
+  cep: z.string().nullable().optional(),
+  municipioIbge: z.string().nullable().optional(),
+  uf: z.string().length(2).nullable().optional(),
+  telefone: z.string().nullable().optional(),
+  celular: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
   tipoTomador: z.enum(["PJ", "PJ_SIMPLES", "MEI", "PF", "COOPERATIVA", "ISENTO"]).optional(),
-  isencaoBaseLegal: z.string().optional(),
+  isencaoBaseLegal: z.string().nullable().optional(),
   declaraSimples: z.boolean().optional(),
   declaracaoPnmpo: z.boolean().optional(),
-  receitaBruta: z.number().nonnegative().optional(),
+  receitaBruta: z.number().nonnegative().nullable().optional(),
 });
 
 // ------------------------------------------------------------------- cedentes

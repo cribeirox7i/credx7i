@@ -120,6 +120,22 @@ export type Cedente = {
   uf: string | null;
   criado_em: string;
 };
+export type CedenteDetalhe = Cedente & {
+  data_abertura: string | null;
+  atividade_economica_id: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cep: string | null;
+  telefone: string | null;
+  celular: string | null;
+  email: string | null;
+  isencao_base_legal: string | null;
+  declara_simples: boolean;
+  declaracao_pnmpo: boolean;
+  receita_bruta: number | null;
+};
 export type HistoricoStatusCedente = {
   cedente_situacao_hist_id: string;
   status_anterior: string | null;
@@ -138,6 +154,17 @@ export type Sacado = {
   municipio_ibge: string | null;
   uf: string | null;
   criado_em: string;
+};
+export type SacadoDetalhe = Sacado & {
+  atividade_economica_id: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cep: string | null;
+  telefone: string | null;
+  celular: string | null;
+  email: string | null;
 };
 
 export type Enquadramento = "PADRAO" | "PNMPO" | "RURAL" | "HABITACIONAL" | "EXPORTACAO" | "RENEGOCIACAO";
@@ -281,6 +308,7 @@ export const api = {
     }),
 
   cedentes: () => req<Cedente[]>("/api/cedentes"),
+  cedente: (id: string) => req<CedenteDetalhe>(`/api/cedentes/${id}`),
   criarCedente: (dados: { cnpj: string; razaoSocial: string; municipioIbge?: string; uf?: string }) =>
     req<{ cedenteId: string }>("/api/cedentes", { method: "POST", body: JSON.stringify(dados) }),
   atualizarCedente: (id: string, dados: Record<string, unknown>) =>
@@ -294,9 +322,10 @@ export const api = {
     req<HistoricoStatusCedente[]>(`/api/cedentes/${id}/historico-status`),
 
   sacados: () => req<Sacado[]>("/api/sacados"),
+  sacado: (id: string) => req<SacadoDetalhe>(`/api/sacados/${id}`),
   criarSacado: (dados: { tipoDocumento: "PF" | "PJ"; documento: string; nomeRazaoSocial: string }) =>
     req<{ sacadoId: string }>("/api/sacados", { method: "POST", body: JSON.stringify(dados) }),
-  atualizarSacado: (id: string, dados: Partial<{ limiteCredito: number; bloqueado: boolean }>) =>
+  atualizarSacado: (id: string, dados: Record<string, unknown>) =>
     req<void>(`/api/sacados/${id}`, { method: "PATCH", body: JSON.stringify(dados) }),
 
   iofTabela: () => req<IofTabelaLinha[]>("/api/iof-tabela"),

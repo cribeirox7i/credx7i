@@ -15,21 +15,23 @@ function camelParaSnake(s: string): string {
   return s.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
 }
 
+// Campos opcionais aceitam null (não só undefined): a tela de edição manda null pra
+// limpar um campo em branco - limiteCredito fica de fora (NOT NULL DEFAULT 0 no banco).
 const camposSacado = z.object({
   tipoDocumento: z.enum(["PF", "PJ"]),
   documento: z.string().min(1),
   nomeRazaoSocial: z.string().min(1),
   atividadeEconomicaId: z.string().uuid().nullable().optional(),
-  logradouro: z.string().optional(),
-  numero: z.string().optional(),
-  complemento: z.string().optional(),
-  bairro: z.string().optional(),
-  cep: z.string().optional(),
-  municipioIbge: z.string().optional(),
-  uf: z.string().length(2).optional(),
-  telefone: z.string().optional(),
-  celular: z.string().optional(),
-  email: z.string().email().optional(),
+  logradouro: z.string().nullable().optional(),
+  numero: z.string().nullable().optional(),
+  complemento: z.string().nullable().optional(),
+  bairro: z.string().nullable().optional(),
+  cep: z.string().nullable().optional(),
+  municipioIbge: z.string().nullable().optional(),
+  uf: z.string().length(2).nullable().optional(),
+  telefone: z.string().nullable().optional(),
+  celular: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
   limiteCredito: z.number().nonnegative().optional(),
   bloqueado: z.boolean().optional(),
 });
